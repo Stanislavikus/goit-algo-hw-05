@@ -1,0 +1,116 @@
+import time
+import pandas as pd
+
+# --- Реалізації алгоритмів ---
+
+def boyer_moore(text, pattern):
+    m, n = len(pattern), len(text)
+    if m == 0:
+        return -1
+    last = {c: i for i, c in enumerate(pattern)}
+    i = m - 1
+    while i < n:
+        j = m - 1
+        k = i
+        while j >= 0 and text[k] == pattern[j]:
+            j -= 1
+            k -= 1
+        if j == -1:
+            return k + 1
+        i += m - min(j, 1 + last.get(text[i], -1))
+    return -1
+
+def kmp(text, pattern):
+    m, n = len(pattern), len(text)
+    lps = [0] * m
+    j = 0
+    # LPS preprocessing
+    for i in range(1, m):
+        while j > 0 and pattern[i] != pattern[j]:
+            j = lps[j-1]
+        if pattern[i] == pattern[j]:
+            j += 1
+            lps[i] = j
+    # Пошук
+    i = j = 0
+    while i < n:
+        if text[i] == pattern[j]:
+            i += 1
+            j += 1
+        if j == m:
+            return i - j
+        elif i < n and text[i] != pattern[j]:
+            if j:
+                j = lps[j-1]
+            else:
+                i += 1
+    return -1
+
+def rabin_karp(text, pattern, prime=101):
+    m, n = len(pattern), len(text)
+    d = 256
+    h = pow(d, m-1) % prime
+    p = t = 0
+    for i in range(m):
+        p = (d*p + ord(pattern[i])) % prime
+        t = (d*t + ord(text[i])) % prime
+    for s in range(n - m + 1):
+        if p == t and text[s:s+m] == pattern:
+            return s
+        if s < n - m:
+            t = (t - h * ord(text[s])) % prime
+            t = (t * d + ord(text[s + m])) % prime
+            t = (t + prime) % prime
+    return -1
+
+# --- Зчитування текстів ---
+def read_file_with_fallback(path):
+    for encoding in ['utf-8-sig', 'utf-8', 'windows-1251', 'cp1252']:
+        try:
+            with open(path, encoding=encoding) as f:
+                return f.read()
+        except UnicodeDecodeError:
+            continue
+    raise UnicodeDecodeError("Cannot decode file with tried encodings.")
+
+text1 = read_file_with_fallback(r"C:\Users\golos\OneDrive\Рабочий стол\Projects\First_repo\goit-algo-hw-05\стаття 1.txt")
+text2 = read_file_with_fallback(r"C:\Users\golos\OneDrive\Рабочий стол\Projects\First_repo\goit-algo-hw-05\стаття 2.txt")
+
+texts = [("Стаття 1", text1), ("Стаття 2", text2)]
+algorithms = [("Boyer-Moore", boyer_moore), ("KMP", kmp), ("Rabin-Karp", rabin_karp)]
+substrings = [("Існуючий", "структури даних"), ("Вигаданий", "вигаданий підрядок")]
+
+results = []
+
+# --- Вимірювання часу ---
+for text_name, text in texts:
+    for sub_name, sub in substrings:
+        for alg_name, alg in algorithms:
+            start = time.time()
+            pos = alg(text, sub)
+            elapsed = time.time() - start
+            results.append({
+                "Текст": text_name,
+                "Алгоритм": alg_name,
+                "Підрядок": sub_name,
+                "Час, сек": round(elapsed, 5),
+                "Позиція": pos
+            })
+
+# Таблиця результатів
+df = pd.DataFrame(results)
+print(df)
+
+# Таблиця з найшвидшими алгоритмами для кожної комбінації "Текст"+"Підрядок"
+fastest = df.loc[df.groupby(['Текст', 'Підрядок'])['Час, сек'].idxmin()]
+
+print("\nНайшвидший алгоритм для кожної статті та підрядка:")
+for idx, row in fastest.iterrows():
+    print(f'Текст: {row["Текст"]}, Підрядок: {row["Підрядок"]} — {row["Алгоритм"]} ({row["Час, сек"]} сек)')
+
+print("\nСередній час для кожного алгоритму по всім тестам:")
+mean_times = df.groupby('Алгоритм')['Час, сек'].mean()
+for alg, avg_time in mean_times.items():
+    print(f'{alg}: {avg_time:.5f} сек')
+
+
